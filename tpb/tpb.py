@@ -87,10 +87,10 @@ class List(object):
             return []
         else:
             rows = table.findall('.//tr')[1:]  # get all rows but header
-            if len(rows) > 30:
-                return rows[:-1] # Remove pagination row
+            if len(rows) == 31:
+                return rows[:-1] # Remove pagination row from browse
             else:
-                return rows
+                return rows # Still return top 100
 
     def _build_torrent(self, row):
 
