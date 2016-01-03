@@ -50,6 +50,7 @@ class List(object):
 
     _meta = re.compile('Uploaded (.*), Size (.*), ULed by (.*)')
     base_path = ''
+    count = 0
 
     def items(self):
         """
@@ -57,7 +58,15 @@ class List(object):
         on page.
         """
         request = get(str(self.url), headers={'User-Agent' : "Magic Browser","origin_req_host" : "thepiratebay.se"})
-        root = html.fromstring(request.text)
+
+        """
+        file = open("newfile.txt", "w")
+        file.write(request.text)
+        file.close()
+        sys.exit(0)
+        """
+
+        root = html.fromstring(request.content)
         items = [self._build_torrent(row) for row in
                  self._get_torrent_rows(root)]
         for item in items:
@@ -71,19 +80,27 @@ class List(object):
         Returns all 'tr' tag rows as a list of tuples. Each tuple is for
         a single torrent.
         """
+        
         table = page.find('.//table')  # the table with all torrent listing
+        
         if table is None:  # no table means no results:
             return []
         else:
-            return table.findall('.//tr')[1:]  # get all rows but header
+            rows = table.findall('.//tr')[1:]  # get all rows but header
+            if len(rows) > 30:
+                return rows[:-1] # Remove pagination row
+            else:
+                return rows
 
     def _build_torrent(self, row):
+
+ 
         """
         Builds and returns a Torrent object for the given parsed row.
         """
         # Scrape, strip and build!!!
         cols = row.findall('.//td')  # split the row into it's columns
-
+        
         # this column contains the categories
         [category, sub_category] = [c.text for c in cols[0].findall('.//a')]
 
@@ -238,7 +255,40 @@ class Search(Paginated):
         if category is None:
             return int(self.url.category)
         self.url.category = str(category)
+		
+class Browse(Paginated):
 
+    """
+    Paginated search featuring query, category and order management.
+    """
+    base_path = '/browse'
+
+    def __init__(self, base_url, page='0', order='3', category='0'):
+        super(Browse, self).__init__()
+        self.url = URL(base_url, self.base_path,
+                       segments=['category', 'page', 'order'],
+                       defaults=[str(category), str(page), str(order)],
+                       )
+
+    @self_if_parameters
+    def order(self, order=None):
+        """
+        If order is given, modify the URL correspondingly, return the current
+        order otherwise.
+        """
+        if order is None:
+            return int(self.url.order)
+        self.url.order = str(order)
+
+    @self_if_parameters
+    def category(self, category=None):
+        """
+        If category is given, modify the URL correspondingly, return the
+        current category otherwise.
+        """
+        if category is None:
+            return int(self.url.category)
+        self.url.category = str(category)			   
 
 class Recent(Paginated):
 
@@ -310,7 +360,16 @@ class TPB(object):
         Lists top Torrents on TPB optionally filtering by category.
         """
         return Top(self.base_url, category)
-
+		
+    def browse(self, page=0, order=3, category=0, multipage=False):
+	"""
+        Browses TPB for a given category and returns a list of paginated Torrents capable
+        of changing categories and orders.
+        """
+        browse = Browse(self.base_url, page, order, category)
+        if multipage:
+            browse.multipage()
+        return browse
 
 class Torrent(object):
 
